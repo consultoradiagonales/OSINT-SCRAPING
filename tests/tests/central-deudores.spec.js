@@ -1,1 +1,15 @@
-import { test, expect } from '@playwright/test';\n\ntest.describe('BCRA Central de Deudores Page', () => {\n  test.beforeEach(async ({ page }) => {\n    await page.goto('/situacion-crediticia/');\n  });\n\n  test('Página carga correctamente', async ({ page }) => {\n    await expect(page).toHaveTitle(/BCRA/);\n    await expect(page.locator('h1')).toBeVisible();\n  });\n\n  test('Título principal es visible', async ({ page }) => {\n    const title = page.locator('h1');\n    await expect(title).toBeVisible();\n  });\n\n  test('Logo del BCRA es visible', async ({ page }) => {\n    const logo = page.locator('img[alt*=\"BCRA\"], img[alt*=\"bcra\"]');\n    await expect(logo.first()).toBeVisible();\n  });\n\n  test('Formulario de búsqueda está presente', async ({ page }) => {\n    const form = page.locator('form').first();\n    await expect(form).toBeVisible();\n  });\n\n  test('Campo de entrada de documento está visible', async ({ page }) => {\n    const input = page.locator('input[type=\"text\"]').first();\n    await expect(input).toBeVisible();\n  });\n\n  test('Botón de búsqueda está presente', async ({ page }) => {\n    const button = page.locator('button').first();\n    await expect(button).toBeVisible();\n  });\n\n  test('Footer tiene información de contacto', async ({ page }) => {\n    const footer = page.locator('footer');\n    await expect(footer).toBeVisible();\n  });\n\n  test('Menú de navegación está presente', async ({ page }) => {\n    const nav = page.locator('nav, [role=\"navigation\"]').first();\n    await expect(nav).toBeVisible();\n  });\n\n  test('Enlaces principales son accesibles', async ({ page }) => {\n    const links = page.locator('a[href]').first();\n    await expect(links).toBeVisible();\n  });\n\n  test('Página es responsiva en móvil', async ({ page }) => {\n    await page.setViewportSize({ width: 375, height: 667 });\n    await expect(page.locator('body')).toBeVisible();\n  });\n});
+import { test, expect } from "@playwright/test";
+
+test.describe("BCRA OSINT Demo", () => {
+  test("carga el frontend local", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "BCRA OSINT Demo" })).toBeVisible();
+    await expect(page.locator("#identifier")).toBeVisible();
+    await expect(page.locator("#apiRun")).toContainText("Consultar API BCRA Wrapper");
+  });
+
+  test("expone el visor de resultados", async ({ page }) => {
+    await page.goto("/visor");
+    await expect(page.getByRole("heading", { name: "Visor BCRA OSINT" })).toBeVisible();
+  });
+});
