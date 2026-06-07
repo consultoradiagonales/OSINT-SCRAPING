@@ -1,0 +1,25 @@
+{
+    "name": "osint-scraping",
+    "version": "1.0.0",
+    "description": "Playwright automation and scraping for BCRA Central de Deudores OSINT",
+    "main": "index.js",
+    "scripts": {
+          "test": "playwright test",
+          "test:headed": "playwright test --headed",
+          "test:debug": "playwright test --debug",
+          "test:ui": "playwright test --ui",
+          "codegen": "playwright codegen https://www.bcra.gob.ar/situacion-crediticia/"
+    },
+    "keywords": [
+          "playwright",
+          "automation",
+          "scraping",
+          "bcra",
+          "osint"
+    ],
+    "author": "Consultora Diagonales",
+    "license": "MIT",
+    "devDependencies": {
+          "@playwright/test": "^1.40.0"
+    }
+}
