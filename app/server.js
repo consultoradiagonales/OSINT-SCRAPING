@@ -8,6 +8,7 @@ const PORT = Number(process.env.PORT || 4321);
 const ROOT = path.resolve(__dirname, "..");
 const OUT_DIR = path.join(ROOT, "exportados", "bcra");
 const LOG_FILE = path.join(ROOT, "tools", "osint-data", "bcra-consultas.jsonl");
+const REPORT_DIR = path.join(ROOT, "exportados", "osint");
 
 let currentRun = null;
 
@@ -23,6 +24,123 @@ function send(res, status, body, type = "application/json; charset=utf-8") {
 
 function normalizeIdentifier(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+function cuitCheckDigit(prefix, dni) {
+  const base = `${prefix}${dni.padStart(8, "0")}`;
+  const weights = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const sum = base.split("").reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
+  const mod = 11 - (sum % 11);
+  if (mod === 11) return "0";
+  if (mod === 10) return null;
+  return String(mod);
+}
+
+function cuitVariantsFromDni(value) {
+  const numeric = normalizeIdentifier(value);
+  if (!/^\d{7,8}$/.test(numeric)) return [];
+  const dni = numeric.padStart(8, "0");
+  return [...new Set(["20", "23", "24", "27", "30", "33", "34"].map(prefix => {
+    const check = cuitCheckDigit(prefix, dni);
+    return check ? `${prefix}${dni}${check}` : null;
+  }).filter(Boolean))];
+}
+
+function formatCuit(value) {
+  const numeric = normalizeIdentifier(value);
+  return /^\d{11}$/.test(numeric) ? `${numeric.slice(0, 2)}-${numeric.slice(2, 10)}-${numeric.slice(10)}` : numeric;
+}
+
+function buildDorks(subject) {
+  const quoted = subject.terms.map(term => `"${term}"`);
+  const base = quoted.join(" OR ");
+  return [
+    { layer: "General", query: base },
+    { layer: "Fuentes oficiales", query: `${base} site:gov.ar OR site:gob.ar OR site:argentina.gob.ar` },
+    { layer: "Boletines y documentos", query: `${base} ("Boletin Oficial" OR edicto OR sociedad OR filetype:pdf OR filetype:xls)` },
+    { layer: "Judicial", query: `${base} (causa OR sentencia OR expediente OR juzgado OR concurso OR quiebra OR embargo)` },
+    { layer: "Contrataciones", query: `${base} (licitacion OR contratacion OR proveedor OR adjudicacion OR compras)` },
+    { layer: "Redes", query: `${base} (site:linkedin.com OR site:facebook.com OR site:instagram.com OR site:x.com)` }
+  ];
+}
+
+function buildSubject(identifier, bcraRecord) {
+  const numeric = normalizeIdentifier(identifier);
+  const isCuit = /^\d{11}$/.test(numeric);
+  const dni = isCuit ? numeric.slice(2, 10).replace(/^0+/, "") : numeric;
+  const variants = isCuit ? [numeric] : cuitVariantsFromDni(numeric);
+  const denomination = bcraRecord?.result?.denominacion || "";
+  const terms = [...new Set([
+    numeric,
+    dni,
+    ...variants,
+    ...variants.map(formatCuit),
+    denomination
+  ].filter(Boolean))];
+  return { input: identifier, numeric, dni, variants, denomination, terms };
+}
+
+function buildOsintReport(subject, bcraRecord) {
+  const now = new Date().toISOString();
+  const dorks = buildDorks(subject);
+  const findings = [];
+  let confidence = "Baja";
+  let signal = "sin_resultado_bcra";
+
+  if (bcraRecord?.result && bcraRecord.result.riskSignal !== "consulta_fallida") {
+    confidence = bcraRecord.confidence || bcraRecord.result.confidence || "Media";
+    signal = bcraRecord.result.riskSignal;
+    findings.push({
+      source: "BCRA Central de Deudores",
+      title: `BCRA: ${bcraRecord.result.denominacion || subject.variants[0] || subject.numeric}`,
+      url: bcraRecord.endpoints?.deudas || "https://api.bcra.gob.ar/centraldedeudores/v1.0",
+      confidence,
+      summary: `Situacion maxima: ${bcraRecord.result.maxSituation}. Entidades actuales: ${bcraRecord.result.currentEntities}. Periodos historicos: ${bcraRecord.result.historicPeriods}. Monto informado: ${bcraRecord.result.totalDebt}.`
+    });
+  }
+
+  const caveats = [
+    "Consulta basada en fuentes abiertas y API publica BCRA.",
+    "No implica verificacion de identidad presencial.",
+    "Validar fecha de periodo, homonimos y fuente primaria antes de tomar decisiones."
+  ];
+
+  return {
+    generatedAt: now,
+    subject,
+    status: findings.length ? "con_hallazgos" : "sin_hallazgos_confirmados",
+    confidence,
+    signal,
+    modules: [
+      {
+        id: "identity",
+        name: "Identidad derivada",
+        status: subject.variants.length ? "ok" : "insuficiente",
+        summary: subject.variants.length
+          ? `DNI ${subject.dni || "-"} con variantes CUIT/CUIL: ${subject.variants.map(formatCuit).join(", ")}.`
+          : "No se pudieron derivar variantes CUIT/CUIL desde el identificador ingresado."
+      },
+      {
+        id: "bcra",
+        name: "BCRA",
+        status: findings.length ? "ok" : "requiere_reintento",
+        summary: findings[0]?.summary || "BCRA no respondio con dato util en esta ejecucion."
+      },
+      {
+        id: "search",
+        name: "Buscadores y documentos",
+        status: "preparado",
+        summary: `${dorks.length} busquedas listas para Google/OSINT launcher.`
+      }
+    ],
+    dorks,
+    findings,
+    caveats,
+    evidence: {
+      bcraRawJsonPath: bcraRecord?.evidence?.rawJsonPath || "",
+      bcraReportPath: bcraRecord?.evidence?.reportPath || ""
+    }
+  };
 }
 
 async function readJsonLines(file) {
@@ -112,6 +230,11 @@ async function handle(req, res) {
     return send(res, 200, html, "text/html; charset=utf-8");
   }
 
+  if (url.pathname === "/bandeja" && req.method === "GET") {
+    const html = await fs.readFile(path.join(__dirname, "bandeja.html"), "utf8");
+    return send(res, 200, html, "text/html; charset=utf-8");
+  }
+
   if (url.pathname === "/api/run" && req.method === "POST") {
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
@@ -158,6 +281,44 @@ async function handle(req, res) {
 
   if (url.pathname === "/api/bcra-health" && req.method === "GET") {
     return send(res, 200, await bcraHealthCheck());
+  }
+
+  if (url.pathname === "/api/bandeja-osint" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", async () => {
+      try {
+        const payload = JSON.parse(body || "{}");
+        const identifier = String(payload.identifier || "").trim();
+        if (!normalizeIdentifier(identifier)) return send(res, 400, { error: "Ingresar DNI, CUIT, CUIL o CDI." });
+
+        let bcraRecord = null;
+        let bcraError = null;
+        try {
+          bcraRecord = await queryBcraWrapper(identifier);
+        } catch (error) {
+          bcraError = error.message;
+        }
+
+        const subject = buildSubject(identifier, bcraRecord);
+        const report = buildOsintReport(subject, bcraRecord);
+        if (bcraError) {
+          report.modules.find(item => item.id === "bcra").summary = bcraError;
+          report.caveats.push("BCRA no respondio en vivo; reintentar o usar evidencia local si existe.");
+        }
+
+        await fs.mkdir(REPORT_DIR, { recursive: true });
+        const safeId = normalizeIdentifier(identifier) || "consulta";
+        const reportPath = path.join(REPORT_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}-${safeId}.bandeja-osint.json`);
+        await fs.writeFile(reportPath, JSON.stringify(report, null, 2), "utf8");
+        report.evidence.reportPath = reportPath;
+
+        send(res, 200, report);
+      } catch (error) {
+        send(res, 500, { error: error.message });
+      }
+    });
+    return;
   }
 
   if (url.pathname === "/api/enter" && req.method === "POST") {

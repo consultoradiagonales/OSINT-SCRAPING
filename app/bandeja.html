@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bandeja OSINT</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --panel: #fff;
+      --ink: #17202a;
+      --muted: #627084;
+      --line: #d6dde7;
+      --blue: #1f6fb8;
+      --blue-dark: #174f84;
+      --green: #177a50;
+      --amber: #9a6100;
+      --red: #a93737;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--ink); }
+    header { background: #102338; color: #fff; padding: 16px 24px; border-bottom: 4px solid #6aa4d9; }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 6px 0 0; color: #c8d6e5; font-size: 14px; }
+    main { width: min(1240px, calc(100vw - 28px)); margin: 20px auto 34px; display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    h2 { margin: 0 0 12px; font-size: 17px; }
+    h3 { margin: 0 0 8px; font-size: 15px; }
+    label { display: block; margin: 12px 0 6px; font-weight: 700; font-size: 14px; }
+    input { width: 100%; border: 1px solid #b7c1cf; border-radius: 6px; padding: 11px 12px; font-size: 16px; }
+    button, a.button { min-height: 42px; border: 1px solid var(--blue-dark); border-radius: 6px; background: var(--blue); color: #fff; font-weight: 700; padding: 0 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+    button.secondary, a.secondary { background: #fff; color: var(--blue-dark); border-color: #aeb8c5; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .actions { display: grid; gap: 10px; margin-top: 14px; }
+    .grid { display: grid; gap: 16px; }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .metric, .module, .finding, .dork { border: 1px solid #e1e7ef; border-radius: 8px; padding: 12px; background: #fbfcfe; }
+    .metric small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .metric strong { display: block; overflow-wrap: anywhere; }
+    .pill { display: inline-flex; min-height: 24px; align-items: center; border-radius: 999px; padding: 2px 9px; font-size: 13px; font-weight: 700; background: #e9edf3; color: #334155; }
+    .pill.ok, .pill.con_hallazgos, .pill.Alta { background: #dff3e9; color: var(--green); }
+    .pill.preparado, .pill.Media { background: #e6f0fb; color: var(--blue-dark); }
+    .pill.requiere_reintento, .pill.Baja { background: #fff3cd; color: var(--amber); }
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.45; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: #0e1722; color: #dce8f5; border-radius: 8px; padding: 12px; max-height: 360px; overflow: auto; font-size: 13px; line-height: 1.45; }
+    .list { display: grid; gap: 10px; }
+    .dork code { display: block; margin-top: 6px; padding: 8px; border-radius: 6px; background: #edf2f7; color: #142033; overflow-wrap: anywhere; }
+    .topline { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+    .toast { position: fixed; right: 18px; bottom: 18px; max-width: 360px; background: #102338; color: #fff; padding: 12px 14px; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,.25); display: none; font-size: 14px; }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 620px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bandeja OSINT</h1>
+    <p>Consulta unica: identidad derivada, BCRA, dorks, hallazgos, evidencia y reporte.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Consulta</h2>
+      <p class="muted">Ingresa DNI, CUIT, CUIL o CDI. El sistema deriva variantes, consulta BCRA y prepara busquedas abiertas.</p>
+      <label for="identifier">Identificador</label>
+      <input id="identifier" placeholder="26534279 o 20-26534279-6" autocomplete="off">
+      <div class="actions">
+        <button id="run">Rastrear bandeja OSINT</button>
+        <button class="secondary" id="copy">Copiar reporte</button>
+        <button class="secondary" id="downloadJson">Descargar JSON</button>
+        <button class="secondary" id="downloadTxt">Descargar TXT</button>
+        <a class="button secondary" href="/">Volver a BCRA</a>
+      </div>
+      <p id="status" class="muted">Sin consulta.</p>
+    </section>
+
+    <div class="grid">
+      <section>
+        <h2>Resumen</h2>
+        <div class="cards">
+          <div class="metric"><small>Estado</small><strong id="metricStatus">-</strong></div>
+          <div class="metric"><small>Confianza</small><strong id="metricConfidence">-</strong></div>
+          <div class="metric"><small>DNI</small><strong id="metricDni">-</strong></div>
+          <div class="metric"><small>CUIT/CUIL principal</small><strong id="metricCuit">-</strong></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Identidad derivada</h2>
+        <pre id="identity">Sin datos.</pre>
+      </section>
+
+      <section>
+        <h2>Modulos</h2>
+        <div id="modules" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Hallazgos</h2>
+        <div id="findings" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Google OSINT launcher</h2>
+        <div id="dorks" class="list"></div>
+      </section>
+
+      <section>
+        <h2>Reporte</h2>
+        <pre id="report">Sin reporte.</pre>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let currentReport = null;
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[char]));
+    }
+
+    function showToast(message) {
+      $("toast").textContent = message;
+      $("toast").style.display = "block";
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => { $("toast").style.display = "none"; }, 3200);
+    }
+
+    function pill(value) {
+      const text = value || "-";
+      return `<span class="pill ${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+    }
+
+    function googleUrl(query) {
+      return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    }
+
+    function textReport(report) {
+      if (!report) return "";
+      return [
+        "BANDEJA OSINT",
+        `Fecha: ${report.generatedAt}`,
+        `Estado: ${report.status}`,
+        `Confianza: ${report.confidence}`,
+        `DNI: ${report.subject?.dni || "-"}`,
+        `Denominacion: ${report.subject?.denomination || "-"}`,
+        `Variantes: ${(report.subject?.variants || []).join(", ") || "-"}`,
+        "",
+        "MODULOS",
+        ...(report.modules || []).map(item => `- ${item.name}: ${item.status}. ${item.summary}`),
+        "",
+        "HALLAZGOS",
+        ...((report.findings || []).length ? report.findings.map(item => `- ${item.source}: ${item.title}. ${item.summary} (${item.url})`) : ["- Sin hallazgos confirmados."]),
+        "",
+        "BUSQUEDAS",
+        ...(report.dorks || []).map(item => `- ${item.layer}: ${item.query}`),
+        "",
+        "CAVEATS",
+        ...(report.caveats || []).map(item => `- ${item}`),
+        "",
+        `Archivo local: ${report.evidence?.reportPath || "-"}`
+      ].join("\n");
+    }
+
+    function download(name, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function render(report) {
+      currentReport = report;
+      $("metricStatus").innerHTML = pill(report.status);
+      $("metricConfidence").innerHTML = pill(report.confidence);
+      $("metricDni").textContent = report.subject?.dni || "-";
+      $("metricCuit").textContent = report.subject?.variants?.[0] || "-";
+      $("identity").textContent = JSON.stringify(report.subject, null, 2);
+
+      $("modules").innerHTML = (report.modules || []).map(item => `
+        <div class="module">
+          <div class="topline"><h3>${escapeHtml(item.name)}</h3>${pill(item.status)}</div>
+          <div class="muted">${escapeHtml(item.summary)}</div>
+        </div>
+      `).join("");
+
+      $("findings").innerHTML = (report.findings || []).length ? report.findings.map(item => `
+        <div class="finding">
+          <div class="topline"><h3>${escapeHtml(item.title)}</h3>${pill(item.confidence)}</div>
+          <div class="muted">${escapeHtml(item.source)}</div>
+          <p>${escapeHtml(item.summary)}</p>
+          <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+        </div>
+      `).join("") : `<p class="muted">Sin hallazgos confirmados todavia.</p>`;
+
+      $("dorks").innerHTML = (report.dorks || []).map(item => `
+        <div class="dork">
+          <div class="topline"><h3>${escapeHtml(item.layer)}</h3><a href="${googleUrl(item.query)}" target="_blank" rel="noreferrer">Buscar</a></div>
+          <code>${escapeHtml(item.query)}</code>
+        </div>
+      `).join("");
+
+      $("report").textContent = textReport(report);
+    }
+
+    async function run() {
+      try {
+        $("run").disabled = true;
+        $("status").textContent = "Consultando fuentes abiertas y armando reporte...";
+        const res = await fetch("/api/bandeja-osint", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier: $("identifier").value })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Error");
+        render(json);
+        $("status").textContent = `Reporte generado: ${json.evidence?.reportPath || "en memoria"}`;
+        showToast("Bandeja OSINT lista.");
+      } catch (error) {
+        $("status").textContent = error.message;
+        showToast(error.message);
+      } finally {
+        $("run").disabled = false;
+      }
+    }
+
+    $("run").addEventListener("click", run);
+    $("identifier").addEventListener("keydown", event => {
+      if (event.key === "Enter") run();
+    });
+    $("copy").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(textReport(currentReport));
+      showToast("Reporte copiado.");
+    });
+    $("downloadJson").addEventListener("click", () => {
+      if (!currentReport) return showToast("Primero ejecuta una consulta.");
+      download("bandeja-osint.json", JSON.stringify(currentReport, null, 2), "application/json");
+    });
+    $("downloadTxt").addEventListener("click", () => {
+      if (!currentReport) return showToast("Primero ejecuta una consulta.");
+      download("bandeja-osint.txt", textReport(currentReport), "text/plain");
+    });
+  </script>
+</body>
+</html>

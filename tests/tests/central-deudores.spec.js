@@ -12,4 +12,11 @@ test.describe("BCRA OSINT Demo", () => {
     await page.goto("/visor");
     await expect(page.getByRole("heading", { name: "Visor BCRA OSINT" })).toBeVisible();
   });
+
+  test("expone la bandeja OSINT", async ({ page }) => {
+    await page.goto("/bandeja");
+    await expect(page.getByRole("heading", { name: "Bandeja OSINT" })).toBeVisible();
+    await expect(page.locator("#identifier")).toBeVisible();
+    await expect(page.locator("#run")).toContainText("Rastrear bandeja OSINT");
+  });
 });

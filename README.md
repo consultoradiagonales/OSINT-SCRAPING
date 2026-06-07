@@ -24,6 +24,7 @@ npm run demo
 Abrir:
 
 - `http://localhost:4321/` para BCRA OSINT Demo.
+- `http://localhost:4321/bandeja` para la bandeja OSINT unificada.
 - `http://localhost:4321/visor` para visualizar resultados.
 
 Motor OSINT general:
@@ -48,3 +49,14 @@ Los resultados se guardan en:
 - `tools/osint-data/`
 
 Esas carpetas estan ignoradas por Git para no subir datos personales, consultas de prueba ni evidencia sensible.
+
+## Bandeja OSINT
+
+La bandeja ejecuta una consulta unica y devuelve:
+
+- Identidad derivada desde DNI/CUIT.
+- Variantes CUIT/CUIL calculadas.
+- Resultado BCRA si la API responde o si existe cache valido.
+- Google dorks listos para abrir.
+- Modulos, hallazgos, caveats y confianza.
+- Reporte JSON local y descarga TXT/JSON desde el navegador.

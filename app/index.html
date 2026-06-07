@@ -72,6 +72,7 @@
 
       <div class="actions">
         <button id="apiRun">Consultar API BCRA Wrapper</button>
+        <button class="secondary" id="viewBandeja">Bandeja OSINT</button>
         <button class="secondary" id="health">Probar conexion BCRA</button>
         <button class="secondary" id="viewResults">Ver resultados</button>
         <button class="secondary" id="viewStatic">Visor editable</button>
@@ -242,6 +243,7 @@
       }
     });
     $("refresh").addEventListener("click", refresh);
+    $("viewBandeja").addEventListener("click", () => { location.href = "/bandeja"; });
     $("viewResults").addEventListener("click", () => { location.href = "/resultados"; });
     $("viewStatic").addEventListener("click", () => { location.href = "/visor"; });
     setInterval(refresh, 4000);
