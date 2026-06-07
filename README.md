@@ -13,6 +13,7 @@ El objetivo es consultar fuentes abiertas, registrar evidencia y construir repor
 - Registro de evidencia JSON, reporte OSINT, fecha, fuente, confianza y caveats.
 - Motor OSINT ampliable para fuentes abiertas, buscadores, boletines, documentos y fuentes oficiales.
 - Conectores asistidos con Playwright para navegar, completar formularios y pausar ante validaciones humanas.
+- Checkpoint humano para CAPTCHA/validaciones anti-abuso, con captura de evidencia y continuacion asistida.
 
 ## Comandos
 
@@ -40,6 +41,8 @@ Abrir:
 ## Politica tecnica
 
 El sistema automatiza navegacion, scraping permitido, consultas a APIs publicas, extraccion y registro de evidencia. Si una fuente exige CAPTCHA, login, validacion humana o bloqueo anti-abuso, el conector debe pausar y esperar intervencion humana. No se implementan bypasses automaticos de CAPTCHA.
+
+El archivo `lib/captcha-solver.js` es un checkpoint asistido: detecta validaciones humanas, captura evidencia y espera resolucion manual en navegador visible.
 
 ## Evidencia local
 
